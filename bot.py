@@ -126,7 +126,7 @@ class UltimateAuditorCloudV41:
                         total_score = p_ema + p_rsi + p_pb + p_vol + p_hhl + mkt_pts + rs_total + p_mom + 1
                         wr, last_10 = self.backtest_logic(df)
 
-                        if total_score >= 8 and wr >= 50:
+                        if total_score >= 10 and wr >= 60:
                             quality_val = "High" if total_score >= 12 else "Watchlist"
                             verdict_val = "Strong Buy" if (total_score >= 12 and wr >= 60) else "Watchlist"
 
