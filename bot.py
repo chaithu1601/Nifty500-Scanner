@@ -151,7 +151,7 @@ class UltimateAuditorCloudV41:
                             target_val = round(last_c + (risk * 2), 2)
                             qty_val = int((CAPITAL * RISK_PERCENT) / risk) if risk > 0 else 0
 
-                            # స్ట్రింగ్స్ ముందే క్లీన్ గా ఫార్మాట్ చేస్తున్నాం (No syntax mixing)
+                            # Clean Strings PRE-FORMATTED
                             score_str = f"{total_score}/14"
                             buy_str = f"₹ {last_c:.2f}"
                             sl_str = f"₹ {sl_val:.2f}"
@@ -166,7 +166,7 @@ class UltimateAuditorCloudV41:
                             ema_txt = "BULLISH (+2)" if p_ema == 2 else "NEUTRAL (0)"
                             hhl_txt = "INTACT (+1)" if p_hhl == 1 else "NORMAL (0)"
 
-                            # --- పక్కాగా అలైన్ చేసిన ఇన్స్టిట్యూషనల్ గ్రిడ్ టేబుల్ ---
+                            # --- పక్కాగా ఫిక్స్ చేసిన ఇన్స్టిట్యూషనల్ గ్రిడ్ టేబుల్ ---
                             full_table_msg = (
                                 f"🔬 *INSTITUTIONAL AUDIT: {t}*\n"
                                 f"```\n"
@@ -203,7 +203,7 @@ class UltimateAuditorCloudV41:
                                 f"├────────────────┴───────────────────────┤\n"
                                 f"│          📉 BACKTEST HISTORY           │\n"
                                 f"├────────────────┬───────────────────────┤\n"
-                                │ 1-YR WIN RATE  │ {wr_str:<21} │\n"
+                                f"│ 1-YR WIN RATE  │ {wr_str:<21} │\n"
                                 f"│ LAST 10 TRADES │ {last_10:<21} │\n"
                                 f"└────────────────┴───────────────────────┘\n"
                                 f"
