@@ -126,7 +126,7 @@ class UltimateAuditorCloudV41:
                         total_score = p_ema + p_rsi + p_pb + p_vol + p_hhl + mkt_pts + rs_total + p_mom + 1
                         wr, last_10 = self.backtest_logic(df)
 
-                        if total_score >= 10 and wr >= 60:
+                        if total_score >= 8 and wr >= 50:
                             quality_val = "High" if total_score >= 12 else "Watchlist"
                             verdict_val = "Strong Buy" if (total_score >= 12 and wr >= 60) else "Watchlist"
 
@@ -138,60 +138,62 @@ class UltimateAuditorCloudV41:
                                 if roe: roe_val = f"{roe * 100:.2f}%"
                             except: pass
 
-                            # Save to Cloud Report
+                            # Save to CSV
                             writer.writerow([
-                                t, f"Score: {total_score}/14", quality_val, round(last_c, 2), sl_val, target_val, 
-                                qty_val, "01:02", f"EMA:{p_ema} RSI:{rsi_status}", f"Nifty:{mkt_pts}", "Normal", "Data N/A", "Bullish",
-                                f"{wr:.0f}%", last_10, verdict_val
+                                t, f"Score: {total_score}/14", quality_val, round(last_c, 2), sl_val, round(last_c + ((last_c - df['Low'].tail(5).min()) * 2), 2), 
+                                int((CAPITAL * RISK_PERCENT) / (last_c - df['Low'].tail(5).min())) if (last_c - df['Low'].tail(5).min()) > 0 else 0, "01:02", 
+                                f"EMA:{p_ema} RSI:{rsi_status}", f"Nifty:{mkt_pts}", "Normal", "Data N/A", "Bullish", f"{wr:.0f}%", last_10, verdict_val
                             ])
 
-                            # --- మొత్తం సమాచారాన్ని ఒకే ఎక్సెల్ టేబుల్ బాక్స్ లాగా మార్చే లాజిక్ ---
+                            # Trade parameters
                             sl_val = round(df['Low'].tail(5).min(), 2)
                             risk = last_c - sl_val
                             target_val = round(last_c + (risk * 2), 2)
                             qty_val = int((CAPITAL * RISK_PERCENT) / risk) if risk > 0 else 0
 
-                            mkt_txt = "BULLISH" if mkt_pts == 1 else "WEAK (ALERT)"
-                            pb_txt = f"{pb_val:.1f}% ({pb_status})"
-                            rsi_txt = f"{rsi:.1f} ({rsi_status})"
+                            mkt_txt = "BULLISH" if mkt_pts == 1 else "WEAK"
+                            ema_txt = "BULLISH (+2)" if p_ema == 2 else "NEUTRAL (0)"
+                            hhl_txt = "INTACT (+1)" if p_hhl == 1 else "NORMAL (0)"
 
+                            # --- సూపర్ ప్రొఫెషనల్ గ్రిడ్ టేబుల్ మెసేజ్ ---
                             full_table_msg = (
                                 f"🔬 *INSTITUTIONAL AUDIT: {t}*\n"
                                 f"```\n"
                                 f"┌────────────────────────────────────────┐\n"
                                 f"│        📊 SCORE & FINAL VERDICT        │\n"
                                 f"├────────────────┬───────────────────────┤\n"
-                                f"│ TOTAL SCORE    │ {total_score:<21}/14 │\n"
-                                f"│ QUALITY GRADE  │ {quality_val:<22} │\n"
-                                f"│ FINAL VERDICT  │ {verdict_val:<22} │\n"
+                                f"│ TOTAL SCORE    │ {total_score:<21} │\n"
+                                f"│ QUALITY GRADE  │ {quality_val:<21} │\n"
+                                f"│ FINAL VERDICT  │ {verdict_val:<21} │\n"
                                 f"├────────────────┴───────────────────────┤\n"
                                 f"│          💰 LIVE TRADE SETUP           │\n"
                                 f"├────────────────┬───────────────────────┤\n"
                                 f"│ BUY PRICE      │ ₹ {last_c:<19.2f} │\n"
                                 f"│ STOP LOSS      │ ₹ {sl_val:<19.2f} │\n"
                                 f"│ TARGET PRICE   │ ₹ {target_val:<19.2f} │\n"
-                                f"│ POSITION QTY   │ {qty_val:<22} │\n"
+                                f"│ POSITION QTY   │ {qty_val:<21} │\n"
                                 f"│ RISK REWARD    │ 1:2                   │\n"
                                 f"├────────────────┴───────────────────────┤\n"
                                 f"│         🔍 TECHNICAL INDICATORS        │\n"
                                 f"├────────────────┬───────────────────────┤\n"
-                                f"│ EMA 20 > 50    │ {('+2) Bullish' if p_ema==2 else '0) Neutral':<22} │\n"
-                                f"│ RSI VALUE      │ {rsi_txt:<22} │\n"
-                                f"│ PULLBACK DIST  │ {pb_txt:<22} │\n"
-                                f"│ VOLUME STATUS  │ {vol_status:<22} │\n"
-                                f"│ PRICE ACTION   │ {('HH (+1) Intact' if p_hhl==1 else 'Normal (0)'):<22} │\n"
+                                f"│ EMA 20 > 50    │ {ema_txt:<21} │\n"
+                                f"│ RSI VALUE      │ {rsi:.1f:<21} │\n"
+                                f"│ RSI STATUS     │ {rsi_status:<21} │\n"
+                                f"│ PULLBACK DIST  │ {pb_val:.2f}%:<21} │\n"
+                                f"│ PULLBACK STAT  │ {pb_status:<21} │\n"
+                                f"│ VOLUME STATUS  │ {vol_status:<21} │\n"
+                                f"│ PRICE ACTION   │ {hhl_txt:<21} │\n"
                                 f"├────────────────┴───────────────────────┤\n"
                                 f"│         💪 STRENGTH & CONTEXT          │\n"
                                 f"├────────────────┬───────────────────────┤\n"
-                                f"│ NIFTY STATUS   │ {mkt_txt:<22} │\n"
-                                f"│ RS BEAT (500)  │ {str(rs_total)+'/3 (1W,1M,3M)':<22} │\n"
-                                f"│ MOMENTUM (52W) │ {('Peak (+1)' if p_mom==1 else 'Normal (0)'):<22} │\n"
-                                f"│ ROE %          │ {roe_val:<22} │\n"
+                                f"│ NIFTY STATUS   │ {mkt_txt:<21} │\n"
+                                f"│ RS BEAT (500)  │ {rs_total:<21} │\n"
+                                f"│ ROE %          │ {roe_val:<21} │\n"
                                 f"├────────────────┴───────────────────────┤\n"
                                 f"│          📉 BACKTEST HISTORY           │\n"
                                 f"├────────────────┬───────────────────────┤\n"
-                                f"│ 1-YR WIN RATE  │ {str(wr)+'%':<22} │\n"
-                                f"│ LAST 10 TRADES │ {last_10:<22} │\n"
+                                f"│ 1-YR WIN RATE  │ {str(wr)+'%':<21} │\n"
+                                f"│ LAST 10 TRADES │ {last_10:<21} │\n"
                                 f"└────────────────┴───────────────────────┘\n"
                                 f"
 ```\n"
