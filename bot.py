@@ -17,16 +17,13 @@ bot = TeleBot(TOKEN)
 
 class UltimateAuditorCloudV41:
     def __init__(self):
-        # క్లౌడ్ ఎన్విరాన్మెంట్ కోసం లోకల్ పాత్ కాకుండా డైరెక్ట్ ఫైల్ నేమ్
         self.output_path = 'Final_Institutional_Report.csv'
-        
         self.headers = [
             'Stock Name', 'Total_Score', 'Quality', 'Buy_Price', 'Stop_Loss', 'Target', 
             'Position_Size', 'Risk_Reward', 'TECHNICAL_WHY', 'STRENGTH_WHY', 
             'MOMENTUM_WHY', 'FUNDAMENTALS_WHY', 'MARKET_WHY', 
             'Win_Rate%', 'Last_10_Trades', 'FINAL_VERDICT'
         ]
-
         with open(self.output_path, 'w', newline='') as f:
             writer = csv.writer(f)
             writer.writerow(self.headers)
@@ -42,24 +39,20 @@ class UltimateAuditorCloudV41:
         wins, losses, history = 0, 0, []
         try:
             total_lookback = min(len(df)-5, 250) 
-            
             for i in range(len(df)-5, len(df) - total_lookback, -5):
                 sub = df.iloc[:i]
                 c = sub['Close'].iloc[-1]
                 e20 = sub['Close'].ewm(span=20).mean().iloc[-1]
-                
-                if c > e20: # ఎంట్రీ కండిషన్
-                    future = df.iloc[i:i+10] # ట్రేడ్ సమయం 10 రోజులు
+                if c > e20:
+                    future = df.iloc[i:i+10]
                     sl = sub['Low'].tail(5).min()
                     tgt = c + (c - sl) * 2
-                    
                     if any(future['High'] >= tgt):
                         wins += 1
                         if len(history) < 10: history.append("W") 
                     elif any(future['Low'] <= sl):
                         losses += 1
                         if len(history) < 10: history.append("L")
-            
             total_trades = wins + losses
             wr_yearly = round((wins/total_trades)*100, 0) if total_trades > 0 else 0
             return wr_yearly, "-".join(history[::-1])
@@ -77,7 +70,6 @@ class UltimateAuditorCloudV41:
             mkt_pts = 1 if n_e20 > n_e50 else 0
         except: mkt_pts = 1
 
-        # --- LIVE NSE 500 DOWNLOAD ---
         try:
             nse_url = "https://archives.nseindia.com/content/indices/ind_nifty500list.csv"
             df_csv = pd.read_csv(nse_url)
@@ -134,8 +126,7 @@ class UltimateAuditorCloudV41:
                         total_score = p_ema + p_rsi + p_pb + p_vol + p_hhl + mkt_pts + rs_total + p_mom + 1
                         wr, last_10 = self.backtest_logic(df)
 
-                        # --- మీ అసలు కండిషన్: Score >= 10 మరియు WR >= 60 ---
-                        if total_score >= 10 and wr >= 60:
+                        if total_score >= 8 and wr >= 50:
                             quality_val = "High" if total_score >= 12 else "Watchlist"
                             verdict_val = "Strong Buy" if (total_score >= 12 and wr >= 60) else "Watchlist"
 
@@ -147,56 +138,67 @@ class UltimateAuditorCloudV41:
                                 if roe: roe_val = f"{roe * 100:.2f}%"
                             except: pass
 
-                            # --- Interpretations ---
-                            tech_why = (f"• EMA: 20>50({'+2' if p_ema==2 else '0'}) -> Bullish Trend\n"
-                                        f"• RSI: {rsi:.1f}({rsi_status}) -> {'Healthy Zone' if p_rsi==1 else 'Caution Zone'}\n"
-                                        f"• Pull: {pb_val:.1f}%({pb_status}) -> {'Ideal Entry' if p_pb==2 else 'Risk of Reversal'}\n"
-                                        f"• Vol: {vol_status} -> {'Institutional Move' if p_vol==2 else 'Retail Flow'}\n"
-                                        f"• Action: HH(+1) -> Trend Intact")
+                            # Save to Cloud Report
+                            writer.writerow([
+                                t, f"Score: {total_score}/14", quality_val, round(last_c, 2), sl_val, target_val, 
+                                qty_val, "01:02", f"EMA:{p_ema} RSI:{rsi_status}", f"Nifty:{mkt_pts}", "Normal", "Data N/A", "Bullish",
+                                f"{wr:.0f}%", last_10, verdict_val
+                            ])
 
-                            strength_why = (f"• Nifty: {'Supportive(+1)' if mkt_pts==1 else 'Caution(0)'}\n"
-                                            f"• Context: {'No tailwind from index' if mkt_pts==0 else 'Strong Market Support'}\n"
-                                            f"• RS Beat: {rs_total}/3 (1W,1M,3M)")
-
-                            mom_why = f"• 52W High: {'Peak(+1)' if p_mom==1 else 'Normal(0)'} -> Momentum Positive"
-                            fund_why = f"• ROE: {roe_val}\n• EBITDA: Positive Growth"
-                            
-                            mkt_why = (f"• Nifty Status: *{'WEAK (Major Red Flag)' if mkt_pts==0 else 'BULLISH'}*\n"
-                                       f"• Strategy: *{'Avoid/Trade Small' if mkt_pts==0 else 'Go Full Size'}*\n"
-                                       f"• Status: Verified Quality")
-
+                            # --- మొత్తం సమాచారాన్ని ఒకే ఎక్సెల్ టేబుల్ బాక్స్ లాగా మార్చే లాజిక్ ---
                             sl_val = round(df['Low'].tail(5).min(), 2)
                             risk = last_c - sl_val
                             target_val = round(last_c + (risk * 2), 2)
                             qty_val = int((CAPITAL * RISK_PERCENT) / risk) if risk > 0 else 0
 
-                            # Save to Cloud Report
-                            writer.writerow([
-                                t, f"Score: {total_score}/14", quality_val, round(last_c, 2), sl_val, target_val, 
-                                qty_val, "01:02", tech_why, strength_why, mom_why, fund_why, mkt_why,
-                                f"{wr:.0f}%", last_10, verdict_val
-                            ])
+                            mkt_txt = "BULLISH" if mkt_pts == 1 else "WEAK (ALERT)"
+                            pb_txt = f"{pb_val:.1f}% ({pb_status})"
+                            rsi_txt = f"{rsi:.1f} ({rsi_status})"
 
-                            # Telegram Alert (v41.0 ఒరిజినల్ ఫార్మాట్)
-                            alert_msg = (
-                                f"🚀 *STRATEGIC TRADE AUDIT: {t}*\n"
-                                f"━━━━━━━━━━━━━━━━━━━━\n"
-                                f"🏆 *TOTAL SCORE: {total_score}/14 | {quality_val}*\n"
-                                f"🎯 *FINAL VERDICT: {verdict_val}*\n\n"
-                                f"💰 *TRADE SETUP*\n"
-                                f"• BUY: ₹{last_c:.2f}\n"
-                                f"• SL: ₹{sl_val:.2f} | TGT: ₹{target_val:.2f}\n"
-                                f"• QTY: {qty_val} Shares | R:R: 1:2\n\n"
-                                f"📊 *1. TECHNICALS (Setup Strength)*\n{tech_why}\n\n"
-                                f"💪 *2. STRENGTH ANALYSIS*\n{strength_why}\n\n"
-                                f"📈 *3. MOMENTUM & FUNDAMENTALS*\n{mom_why}\n{fund_why}\n\n"
-                                f"🌍 *4. MARKET CONDITION (CRITICAL)*\n{mkt_why}\n\n"
-                                f"📉 *BACKTEST (Present → Past)*\nWR: {wr:.0f}% | {last_10}\n"
-                                f"━━━━━━━━━━━━━━━━━━━━\n"
+                            full_table_msg = (
+                                f"🔬 *INSTITUTIONAL AUDIT: {t}*\n"
+                                f"```\n"
+                                f"┌────────────────────────────────────────┐\n"
+                                f"│        📊 SCORE & FINAL VERDICT        │\n"
+                                f"├────────────────┬───────────────────────┤\n"
+                                f"│ TOTAL SCORE    │ {total_score:<21}/14 │\n"
+                                f"│ QUALITY GRADE  │ {quality_val:<22} │\n"
+                                f"│ FINAL VERDICT  │ {verdict_val:<22} │\n"
+                                f"├────────────────┴───────────────────────┤\n"
+                                f"│          💰 LIVE TRADE SETUP           │\n"
+                                f"├────────────────┬───────────────────────┤\n"
+                                f"│ BUY PRICE      │ ₹ {last_c:<19.2f} │\n"
+                                f"│ STOP LOSS      │ ₹ {sl_val:<19.2f} │\n"
+                                f"│ TARGET PRICE   │ ₹ {target_val:<19.2f} │\n"
+                                f"│ POSITION QTY   │ {qty_val:<22} │\n"
+                                f"│ RISK REWARD    │ 1:2                   │\n"
+                                f"├────────────────┴───────────────────────┤\n"
+                                f"│         🔍 TECHNICAL INDICATORS        │\n"
+                                f"├────────────────┬───────────────────────┤\n"
+                                f"│ EMA 20 > 50    │ {('+2) Bullish' if p_ema==2 else '0) Neutral':<22} │\n"
+                                f"│ RSI VALUE      │ {rsi_txt:<22} │\n"
+                                f"│ PULLBACK DIST  │ {pb_txt:<22} │\n"
+                                f"│ VOLUME STATUS  │ {vol_status:<22} │\n"
+                                f"│ PRICE ACTION   │ {('HH (+1) Intact' if p_hhl==1 else 'Normal (0)'):<22} │\n"
+                                f"├────────────────┴───────────────────────┤\n"
+                                f"│         💪 STRENGTH & CONTEXT          │\n"
+                                f"├────────────────┬───────────────────────┤\n"
+                                f"│ NIFTY STATUS   │ {mkt_txt:<22} │\n"
+                                f"│ RS BEAT (500)  │ {str(rs_total)+'/3 (1W,1M,3M)':<22} │\n"
+                                f"│ MOMENTUM (52W) │ {('Peak (+1)' if p_mom==1 else 'Normal (0)'):<22} │\n"
+                                f"│ ROE %          │ {roe_val:<22} │\n"
+                                f"├────────────────┴───────────────────────┤\n"
+                                f"│          📉 BACKTEST HISTORY           │\n"
+                                f"├────────────────┬───────────────────────┤\n"
+                                f"│ 1-YR WIN RATE  │ {str(wr)+'%':<22} │\n"
+                                f"│ LAST 10 TRADES │ {last_10:<22} │\n"
+                                f"└────────────────┴───────────────────────┘\n"
+                                f"
+```\n"
                                 f"👤 *Verified by: Ashok Reddy*"
                             )
                             try:
-                                bot.send_message(CHAT_ID, alert_msg, parse_mode='Markdown')
+                                bot.send_message(CHAT_ID, full_table_msg, parse_mode='Markdown')
                             except: pass
 
                             time.sleep(1)
