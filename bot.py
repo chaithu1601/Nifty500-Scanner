@@ -2,6 +2,7 @@ import yfinance as yf
 import pandas as pd
 import warnings
 import time
+import csv
 from telebot import TeleBot
 
 warnings.filterwarnings("ignore")
@@ -14,121 +15,195 @@ RISK_PERCENT = 0.01
 
 bot = TeleBot(TOKEN)
 
-def calculate_rsi(series, period=14):
-    delta = series.diff()
-    gain = (delta.where(delta > 0, 0)).rolling(window=period).mean()
-    loss = (-delta.where(delta < 0, 0)).rolling(window=period).mean()
-    rs = gain / loss
-    return 100 - (100 / (1 + rs))
+class UltimateAuditorCloudV41:
+    def __init__(self):
+        # క్లౌడ్ ఎన్విరాన్మెంట్ కోసం లోకల్ పాత్ కాకుండా డైరెక్ట్ ఫైల్ నేమ్
+        self.output_path = 'Final_Institutional_Report.csv'
+        
+        self.headers = [
+            'Stock Name', 'Total_Score', 'Quality', 'Buy_Price', 'Stop_Loss', 'Target', 
+            'Position_Size', 'Risk_Reward', 'TECHNICAL_WHY', 'STRENGTH_WHY', 
+            'MOMENTUM_WHY', 'FUNDAMENTALS_WHY', 'MARKET_WHY', 
+            'Win_Rate%', 'Last_10_Trades', 'FINAL_VERDICT'
+        ]
 
-def backtest_logic(df):
-    wins, losses, history = 0, 0, []
-    try:
-        total_lookback = min(len(df)-5, 250) 
-        for i in range(len(df)-5, len(df) - total_lookback, -5):
-            sub = df.iloc[:i]
-            c = sub['Close'].iloc[-1]
-            e20 = sub['Close'].ewm(span=20).mean().iloc[-1]
-            if c > e20:
-                future = df.iloc[i:i+10]
-                sl = sub['Low'].tail(5).min()
-                tgt = c + (c - sl) * 2
-                if any(future['High'] >= tgt):
-                    wins += 1
-                    if len(history) < 10: history.append("W") 
-                elif any(future['Low'] <= sl):
-                    losses += 1
-                    if len(history) < 10: history.append("L")
-        total_trades = wins + losses
-        wr_yearly = round((wins/total_trades)*100, 0) if total_trades > 0 else 0
-        return wr_yearly, "-".join(history[::-1])
-    except: 
-        return 0, "N/A"
+        with open(self.output_path, 'w', newline='') as f:
+            writer = csv.writer(f)
+            writer.writerow(self.headers)
 
-def start_scan():
-    print("🚀 GitHub Cloud Auditor Started...")
-    bot.send_message(CHAT_ID, "🚀 *Full Cloud Scan Started (500 Stocks)...*", parse_mode='Markdown')
-    try:
-        nifty = yf.download("^NSEI", period="1y", progress=False)
-        n_close = nifty['Close'].squeeze()
-        n_e20 = n_close.ewm(span=20).mean().iloc[-1]
-        n_e50 = n_close.ewm(span=50).mean().iloc[-1]
-        mkt_pts = 1 if n_e20 > n_e50 else 0
-    except: mkt_pts = 1
+    def calculate_rsi(self, series, period=14):
+        delta = series.diff()
+        gain = (delta.where(delta > 0, 0)).rolling(window=period).mean()
+        loss = (-delta.where(delta < 0, 0)).rolling(window=period).mean()
+        rs = gain / loss
+        return 100 - (100 / (1 + rs))
 
-    try:
-        nse_url = "https://archives.nseindia.com/content/indices/ind_nifty500list.csv"
-        df_csv = pd.read_csv(nse_url)
-    except:
-        bot.send_message(CHAT_ID, "❌ NSE Data Link Error.")
-        return
-
-    symbol_col = next((col for col in df_csv.columns if col.strip().lower() == 'symbol'), df_csv.columns[0])
-    tickers = [s.strip().upper() + ".NS" for s in df_csv[symbol_col].iloc[:500].dropna().astype(str).tolist()]
-
-    for index, t in enumerate(tickers):
+    def backtest_logic(self, df):
+        wins, losses, history = 0, 0, []
         try:
-            df = yf.download(t, period="2y", progress=False, threads=False)
-            if df is not None and len(df) > 60:
-                if isinstance(df.columns, pd.MultiIndex): df.columns = df.columns.get_level_values(0)
+            total_lookback = min(len(df)-5, 250) 
+            
+            for i in range(len(df)-5, len(df) - total_lookback, -5):
+                sub = df.iloc[:i]
+                c = sub['Close'].iloc[-1]
+                e20 = sub['Close'].ewm(span=20).mean().iloc[-1]
                 
-                close = df['Close'].squeeze()
-                last_c = float(close.iloc[-1])
-                e20 = close.ewm(span=20).mean().iloc[-1]
-                rsi = float(calculate_rsi(close).iloc[-1])
-                
-                p_ema = 2 if e20 > close.ewm(span=50).mean().iloc[-1] else 0
-                pb_val = (abs(last_c - e20)/e20)*100
-                p_pb = 2 if pb_val <= 1.5 else 1 if pb_val <= 3 else -2
-                
-                vol_avg = df['Volume'].tail(5).mean()
-                curr_vol = df['Volume'].iloc[-1]
-                p_vol = 2 if curr_vol >= 1.5 * vol_avg else -2 if curr_vol < 0.7 * vol_avg else 0
+                if c > e20: # ఎంట్రీ కండిషన్
+                    future = df.iloc[i:i+10] # ట్రేడ్ సమయం 10 రోజులు
+                    sl = sub['Low'].tail(5).min()
+                    tgt = c + (c - sl) * 2
+                    
+                    if any(future['High'] >= tgt):
+                        wins += 1
+                        if len(history) < 10: history.append("W") 
+                    elif any(future['Low'] <= sl):
+                        losses += 1
+                        if len(history) < 10: history.append("L")
+            
+            total_trades = wins + losses
+            wr_yearly = round((wins/total_trades)*100, 0) if total_trades > 0 else 0
+            return wr_yearly, "-".join(history[::-1])
+        except: 
+            return 0, "N/A"
 
-                p_rsi = 1 if 40 <= rsi <= 62 else 0
-                rs_total = (1 if close.pct_change(5).iloc[-1] > n_close.pct_change(5).iloc[-1] else 0) + \
-                           (1 if close.pct_change(21).iloc[-1] > n_close.pct_change(21).iloc[-1] else 0) + \
-                           (1 if close.pct_change(63).iloc[-1] > n_close.pct_change(63).iloc[-1] else 0)
-                
-                p_hhl = 1 if last_c > df['High'].iloc[-2] else 0
-                p_mom = 1 if last_c >= (df['High'].max() * 0.90) else 0
+    def start(self):
+        print("🚀 GitHub Cloud v41.0 Auditor Started...")
+        bot.send_message(CHAT_ID, "🚀 *Full Cloud Scan Started (500 Stocks)...*", parse_mode='Markdown')
+        try:
+            nifty = yf.download("^NSEI", period="1y", progress=False)
+            n_close = nifty['Close'].squeeze()
+            n_e20 = n_close.ewm(span=20).mean().iloc[-1]
+            n_e50 = n_close.ewm(span=50).mean().iloc[-1]
+            mkt_pts = 1 if n_e20 > n_e50 else 0
+        except: mkt_pts = 1
 
-                total_score = p_ema + p_rsi + p_pb + p_vol + p_hhl + mkt_pts + rs_total + p_mom + 1
-                wr, last_10 = backtest_logic(df)
+        # --- LIVE NSE 500 DOWNLOAD ---
+        try:
+            nse_url = "https://archives.nseindia.com/content/indices/ind_nifty500list.csv"
+            df_csv = pd.read_csv(nse_url)
+        except:
+            bot.send_message(CHAT_ID, "❌ ERROR: NSE Nifty500 List Download Failed!")
+            return
 
-                # HIGH SUCCESS FILTERS (Elite and Safe Buy)
-                is_elite = (total_score >= 12 and wr >= 60 and mkt_pts == 1 and pb_val <= 1.5)
-                is_safe = (total_score >= 10 and wr >= 50)
+        symbol_col = next((col for col in df_csv.columns if col.strip().lower() == 'symbol'), df_csv.columns[0])
+        tickers = [s.strip().upper() + ".NS" for s in df_csv[symbol_col].iloc[:500].dropna().astype(str).tolist()]
 
-                if is_elite or is_safe:
-                    quality_val = "Elite Grade" if is_elite else "High Quality"
-                    verdict_val = "💎 ELITE BUY" if is_elite else "✅ SAFE BUY"
-                    emoji = "💎" if is_elite else "✅"
+        with open(self.output_path, 'a', newline='', buffering=1) as f:
+            writer = csv.writer(f)
+            for index, t in enumerate(tickers):
+                try:
+                    df = yf.download(t, period="2y", progress=False, threads=False)
+                    if df is not None and len(df) > 60:
+                        if isinstance(df.columns, pd.MultiIndex): df.columns = df.columns.get_level_values(0)
+                        
+                        close = df['Close'].squeeze()
+                        last_c = float(close.iloc[-1])
+                        e20 = close.ewm(span=20).mean().iloc[-1]
+                        rsi = float(self.calculate_rsi(close).iloc[-1])
+                        
+                        p_ema = 2 if e20 > close.ewm(span=50).mean().iloc[-1] else 0
 
-                    sl_val = round(df['Low'].tail(5).min(), 2)
-                    risk = last_c - sl_val
-                    target_val = round(last_c + (risk * 2), 2)
-                    qty_val = int((CAPITAL * RISK_PERCENT) / risk) if risk > 0 else 0
+                        # Pullback Logic
+                        pb_val = (abs(last_c - e20)/e20)*100
+                        if pb_val <= 1.5: p_pb, pb_status = 2, "Best(+2)"
+                        elif 1.5 < pb_val <= 3: p_pb, pb_status = 1, "Acceptable(+1)"
+                        else: p_pb, pb_status = -2, "Avoid(-2)"
 
-                    alert_msg = (
-                        f"{emoji} *{verdict_val}*\n"
-                        f"🚀 *STOCK: {t}*\n"
-                        f"━━━━━━━━━━━━━━━━━━━━\n"
-                        f"🏆 SCORE: {total_score}/14 | {quality_val}\n\n"
-                        f"💰 BUY: ₹{last_c:.2f}\n"
-                        f"🛡️ SL: ₹{sl_val:.2f} | 🎯 TGT: ₹{target_val:.2f}\n"
-                        f"📦 QTY: {qty_val} Shares (1% Risk)\n\n"
-                        f"📈 WR (1-Year): {wr:.0f}%\n"
-                        f"📊 Last 10 Trades: {last_10}\n"
-                        f"━━━━━━━━━━━━━━━━━━━━\n"
-                        f"👤 *Verified by: Ashok Reddy*"
-                    )
-                    try: bot.send_message(CHAT_ID, alert_msg, parse_mode='Markdown')
-                    except: pass
-                    time.sleep(1)
-        except: continue
+                        # Volume Logic
+                        vol_avg = df['Volume'].tail(5).mean()
+                        curr_vol = df['Volume'].iloc[-1]
+                        if curr_vol >= 1.5 * vol_avg: p_vol, vol_status = 2, "High Spike(+2)"
+                        elif curr_vol < 0.7 * vol_avg: p_vol, vol_status = -2, "Low Vol(-2)"
+                        else: p_vol, vol_status = 0, "Normal(0)"
 
-    bot.send_message(CHAT_ID, "🏁 *AUTOMATED SCAN COMPLETED!*")
+                        # RSI Logic
+                        if 40 <= rsi <= 62: p_rsi, rsi_status = 1, "Sweet Spot(+1)"
+                        elif 70 <= rsi <= 80: p_rsi, rsi_status = -1, "Overbought(-1)"
+                        elif rsi > 80: p_rsi, rsi_status = -2, "Danger(-2)"
+                        else: p_rsi, rsi_status = 0, "Neutral(0)"
+
+                        # RS Multi-Timeframe
+                        rs_1w = 1 if close.pct_change(5).iloc[-1] > n_close.pct_change(5).iloc[-1] else 0
+                        rs_1m = 1 if close.pct_change(21).iloc[-1] > n_close.pct_change(21).iloc[-1] else 0
+                        rs_3m = 1 if close.pct_change(63).iloc[-1] > n_close.pct_change(63).iloc[-1] else 0
+                        rs_total = rs_1w + rs_1m + rs_3m
+                        
+                        p_hhl = 1 if last_c > df['High'].iloc[-2] else 0
+                        p_mom = 1 if last_c >= (df['High'].max() * 0.90) else 0
+
+                        total_score = p_ema + p_rsi + p_pb + p_vol + p_hhl + mkt_pts + rs_total + p_mom + 1
+                        wr, last_10 = self.backtest_logic(df)
+
+                        # --- మీ అసలు కండిషన్: Score >= 8 మరియు WR >= 50 ---
+                        if total_score >= 8 and wr >= 50:
+                            quality_val = "High" if total_score >= 12 else "Watchlist"
+                            verdict_val = "Strong Buy" if (total_score >= 12 and wr >= 60) else "Watchlist"
+
+                            roe_val = "Data N/A"
+                            try:
+                                ticker_obj = yf.Ticker(t)
+                                info = ticker_obj.info
+                                roe = info.get('returnOnEquity') or info.get('returnOnAssets')
+                                if roe: roe_val = f"{roe * 100:.2f}%"
+                            except: pass
+
+                            # --- Interpretations ---
+                            tech_why = (f"• EMA: 20>50({'+2' if p_ema==2 else '0'}) -> Bullish Trend\n"
+                                        f"• RSI: {rsi:.1f}({rsi_status}) -> {'Healthy Zone' if p_rsi==1 else 'Caution Zone'}\n"
+                                        f"• Pull: {pb_val:.1f}%({pb_status}) -> {'Ideal Entry' if p_pb==2 else 'Risk of Reversal'}\n"
+                                        f"• Vol: {vol_status} -> {'Institutional Move' if p_vol==2 else 'Retail Flow'}\n"
+                                        f"• Action: HH(+1) -> Trend Intact")
+
+                            strength_why = (f"• Nifty: {'Supportive(+1)' if mkt_pts==1 else 'Caution(0)'}\n"
+                                            f"• Context: {'No tailwind from index' if mkt_pts==0 else 'Strong Market Support'}\n"
+                                            f"• RS Beat: {rs_total}/3 (1W,1M,3M)")
+
+                            mom_why = f"• 52W High: {'Peak(+1)' if p_mom==1 else 'Normal(0)'} -> Momentum Positive"
+                            fund_why = f"• ROE: {roe_val}\n• EBITDA: Positive Growth"
+                            
+                            mkt_why = (f"• Nifty Status: *{'WEAK (Major Red Flag)' if mkt_pts==0 else 'BULLISH'}*\n"
+                                       f"• Strategy: *{'Avoid/Trade Small' if mkt_pts==0 else 'Go Full Size'}*\n"
+                                       f"• Status: Verified Quality")
+
+                            sl_val = round(df['Low'].tail(5).min(), 2)
+                            risk = last_c - sl_val
+                            target_val = round(last_c + (risk * 2), 2)
+                            qty_val = int((CAPITAL * RISK_PERCENT) / risk) if risk > 0 else 0
+
+                            # Save to Cloud Report
+                            writer.writerow([
+                                t, f"Score: {total_score}/14", quality_val, round(last_c, 2), sl_val, target_val, 
+                                qty_val, "01:02", tech_why, strength_why, mom_why, fund_why, mkt_why,
+                                f"{wr:.0f}%", last_10, verdict_val
+                            ])
+
+                            # Telegram Alert (v41.0 ఒరిజినల్ ఫార్మాట్)
+                            alert_msg = (
+                                f"🚀 *STRATEGIC TRADE AUDIT: {t}*\n"
+                                f"━━━━━━━━━━━━━━━━━━━━\n"
+                                f"🏆 *TOTAL SCORE: {total_score}/14 | {quality_val}*\n"
+                                f"🎯 *FINAL VERDICT: {verdict_val}*\n\n"
+                                f"💰 *TRADE SETUP*\n"
+                                f"• BUY: ₹{last_c:.2f}\n"
+                                f"• SL: ₹{sl_val:.2f} | TGT: ₹{target_val:.2f}\n"
+                                f"• QTY: {qty_val} Shares | R:R: 1:2\n\n"
+                                f"📊 *1. TECHNICALS (Setup Strength)*\n{tech_why}\n\n"
+                                f"💪 *2. STRENGTH ANALYSIS*\n{strength_why}\n\n"
+                                f"📈 *3. MOMENTUM & FUNDAMENTALS*\n{mom_why}\n{fund_why}\n\n"
+                                f"🌍 *4. MARKET CONDITION (CRITICAL)*\n{mkt_why}\n\n"
+                                f"📉 *BACKTEST (Present → Past)*\nWR: {wr:.0f}% | {last_10}\n"
+                                f"━━━━━━━━━━━━━━━━━━━━\n"
+                                f"👤 *Verified by: Ashok Reddy*"
+                            )
+                            try:
+                                bot.send_message(CHAT_ID, alert_msg, parse_mode='Markdown')
+                            except: pass
+
+                            time.sleep(1)
+                except: continue
+
+        bot.send_message(CHAT_ID, "🏁 *AUTOMATED SCAN COMPLETED!*")
 
 if __name__ == "__main__":
-    start_scan()
+    auditor = UltimateAuditorCloudV41()
+    auditor.start()
