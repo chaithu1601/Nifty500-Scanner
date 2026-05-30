@@ -71,7 +71,7 @@ class UltimateAuditorCloudV41:
         except: mkt_pts = 1
 
         try:
-            nse_url = "https://archives.nseindia.com/content/indices/ind_nifty500list.csv"
+            nse_url = "[https://archives.nseindia.com/content/indices/ind_nifty500list.csv](https://archives.nseindia.com/content/indices/ind_nifty500list.csv)"
             df_csv = pd.read_csv(nse_url)
         except:
             bot.send_message(CHAT_ID, "❌ ERROR: NSE Nifty500 List Download Failed!")
@@ -138,18 +138,16 @@ class UltimateAuditorCloudV41:
                                 if roe: roe_val = f"{roe * 100:.2f}%"
                             except: pass
 
-                            # Save to CSV
-                            writer.writerow([
-                                t, f"Score: {total_score}/14", quality_val, round(last_c, 2), sl_val, round(last_c + ((last_c - df['Low'].tail(5).min()) * 2), 2), 
-                                int((CAPITAL * RISK_PERCENT) / (last_c - df['Low'].tail(5).min())) if (last_c - df['Low'].tail(5).min()) > 0 else 0, "01:02", 
-                                f"EMA:{p_ema} RSI:{rsi_status}", f"Nifty:{mkt_pts}", "Normal", "Data N/A", "Bullish", f"{wr:.0f}%", last_10, verdict_val
-                            ])
-
-                            # Trade parameters
                             sl_val = round(df['Low'].tail(5).min(), 2)
                             risk = last_c - sl_val
                             target_val = round(last_c + (risk * 2), 2)
                             qty_val = int((CAPITAL * RISK_PERCENT) / risk) if risk > 0 else 0
+
+                            # Save to CSV
+                            writer.writerow([
+                                t, f"Score: {total_score}/14", quality_val, round(last_c, 2), sl_val, target_val, 
+                                qty_val, "01:02", f"EMA:{p_ema} RSI:{rsi_status}", f"Nifty:{mkt_pts}", "Normal", "Data N/A", "Bullish", f"{wr:.0f}%", last_10, verdict_val
+                            ])
 
                             # Clean Strings PRE-FORMATTED
                             score_str = f"{total_score}/14"
@@ -206,8 +204,7 @@ class UltimateAuditorCloudV41:
                                 f"│ 1-YR WIN RATE  │ {wr_str:<21} │\n"
                                 f"│ LAST 10 TRADES │ {last_10:<21} │\n"
                                 f"└────────────────┴───────────────────────┘\n"
-                                f"
-```\n"
+                                f"```\n"
                                 f"👤 *Verified by: Ashok Reddy*"
                             )
                             try:
