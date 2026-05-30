@@ -70,8 +70,9 @@ class UltimateAuditorCloudV41:
             mkt_pts = 1 if n_e20 > n_e50 else 0
         except: mkt_pts = 1
 
+        # --- LIVE NSE 500 DOWNLOAD (FIXED LINK) ---
         try:
-            nse_url = "[https://archives.nseindia.com/content/indices/ind_nifty500list.csv](https://archives.nseindia.com/content/indices/ind_nifty500list.csv)"
+            nse_url = "https://archives.nseindia.com/content/indices/ind_nifty500list.csv"
             df_csv = pd.read_csv(nse_url)
         except:
             bot.send_message(CHAT_ID, "❌ ERROR: NSE Nifty500 List Download Failed!")
@@ -164,7 +165,7 @@ class UltimateAuditorCloudV41:
                             ema_txt = "BULLISH (+2)" if p_ema == 2 else "NEUTRAL (0)"
                             hhl_txt = "INTACT (+1)" if p_hhl == 1 else "NORMAL (0)"
 
-                            # --- పక్కాగా ఫిక్స్ చేసిన ఇన్స్టిట్యూషనల్ గ్రిడ్ టేబుల్ ---
+                            # --- సూపర్ ప్రొఫెషనల్ ఇన్స్టిట్యూషనల్ గ్రిడ్ టేబుల్ ---
                             full_table_msg = (
                                 f"🔬 *INSTITUTIONAL AUDIT: {t}*\n"
                                 f"```\n"
