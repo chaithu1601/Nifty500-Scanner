@@ -3,18 +3,15 @@ name: Run Trading Bot Daily
 on:
   workflow_dispatch: # దీనివల్ల మీరు మొబైల్ నుండి మ్యాన్యువల్ గా రన్ చేసుకోవడానికి బటన్ ఉంటుంది.
 
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-
 jobs:
   run-bot:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v4.2.2
 
       - name: Setup Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v5.4.0
         with:
           python-version: '3.10'
 
