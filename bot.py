@@ -135,7 +135,7 @@ class UltimateAuditorCloudV41:
                         wr, last_10 = self.backtest_logic(df)
 
                         # --- మీ అసలు కండిషన్: Score >= 8 మరియు WR >= 50 ---
-                        if total_score >= 9 and wr >= 60:
+                        if total_score >= 10 and wr >= 60:
                             quality_val = "High" if total_score >= 12 else "Watchlist"
                             verdict_val = "Strong Buy" if (total_score >= 12 and wr >= 60) else "Watchlist"
 
