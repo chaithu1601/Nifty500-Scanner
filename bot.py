@@ -3,6 +3,8 @@ import pandas as pd
 import warnings
 import time
 import csv
+import gspread
+from oauth2client.service_account import ServiceAccountCredentials
 from telebot import TeleBot
 
 warnings.filterwarnings("ignore")
@@ -12,24 +14,40 @@ TOKEN = "8695254241:AAFCHtioWd8X5mNw17EvL6X0z1pjtjIRtVE"
 CHAT_ID = "855009167"
 CAPITAL = 500000
 RISK_PERCENT = 0.01
+GOOGLE_SHEET_NAME = "Trading Journal" 
 
 bot = TeleBot(TOKEN)
 
-class UltimateAuditorCloudV41:
+class UltimateAuditorCloudV43:
     def __init__(self):
-        # క్లౌడ్ ఎన్విరాన్మెంట్ కోసం లోకల్ పాత్ కాకుండా డైరెక్ట్ ఫైల్ నేమ్
         self.output_path = 'Final_Institutional_Report.csv'
         
+        # 🟢 మీ 16 పాయింట్ల పక్కా గూగుల్ షీట్ హెడర్స్ ఆర్డర్
         self.headers = [
-            'Stock Name', 'Total_Score', 'Quality', 'Buy_Price', 'Stop_Loss', 'Target', 
-            'Position_Size', 'Risk_Reward', 'TECHNICAL_WHY', 'STRENGTH_WHY', 
-            'MOMENTUM_WHY', 'FUNDAMENTALS_WHY', 'MARKET_WHY', 
-            'Win_Rate%', 'Last_10_Trades', 'FINAL_VERDICT'
+            'Date of Entry', 'Stock Name', 'Buy_Price', 'Stop_Loss', 'Target', 
+            'Live Price', '% Change (Buy vs Live)', 'Status', 'Target %', 'SL %', 
+            'Hit Date and time', '12. TECHNICALS', '13. STRENGTH ANALYSIS', 
+            '14. MOMENTUM & FUNDAMENTALS', '15. MARKET CONDITION', '16. BACKTEST HISTORY'
         ]
 
         with open(self.output_path, 'w', newline='') as f:
             writer = csv.writer(f)
             writer.writerow(self.headers)
+            
+        self.sheet = None
+        self.init_google_sheets()
+
+    def init_google_sheets(self):
+        try:
+            scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+            creds = ServiceAccountCredentials.from_json_keyfile_name("credentials.json", scope)
+            client = gspread.authorize(creds)
+            self.sheet = client.open(GOOGLE_SHEET_NAME).sheet1
+            print("✅ Google Sheets Connection Successful!")
+            if not self.sheet.get_all_values():
+                self.sheet.append_row(self.headers)
+        except Exception as e:
+            print(f"⚠️ Google Sheets Connection Failed: {e}")
 
     def calculate_rsi(self, series, period=14):
         delta = series.diff()
@@ -42,14 +60,13 @@ class UltimateAuditorCloudV41:
         wins, losses, history = 0, 0, []
         try:
             total_lookback = min(len(df)-5, 250) 
-            
             for i in range(len(df)-5, len(df) - total_lookback, -5):
                 sub = df.iloc[:i]
                 c = sub['Close'].iloc[-1]
                 e20 = sub['Close'].ewm(span=20).mean().iloc[-1]
                 
-                if c > e20: # ఎంట్రీ కండిషన్
-                    future = df.iloc[i:i+10] # ట్రేడ్ సమయం 10 రోజులు
+                if c > e20:
+                    future = df.iloc[i:i+10]
                     sl = sub['Low'].tail(5).min()
                     tgt = c + (c - sl) * 2
                     
@@ -67,8 +84,9 @@ class UltimateAuditorCloudV41:
             return 0, "N/A"
 
     def start(self):
-        print("🚀 GitHub Cloud v41.0 Auditor Started...")
-        bot.send_message(CHAT_ID, "🚀 *Full Cloud Scan Started (500 Stocks)...*", parse_mode='Markdown')
+        print("🚀 Cloud v43.0 Active: 20-Point Balanced Scoring System Engaged...")
+        bot.send_message(CHAT_ID, "🚀 *Cloud Scan Started (Ultimate 20-Point Scoring & 16-Column Journal Active)...*", parse_mode='Markdown')
+        
         try:
             nifty = yf.download("^NSEI", period="1y", progress=False)
             n_close = nifty['Close'].squeeze()
@@ -77,7 +95,6 @@ class UltimateAuditorCloudV41:
             mkt_pts = 1 if n_e20 > n_e50 else 0
         except: mkt_pts = 1
 
-        # --- LIVE NSE 500 DOWNLOAD ---
         try:
             nse_url = "https://archives.nseindia.com/content/indices/ind_nifty500list.csv"
             df_csv = pd.read_csv(nse_url)
@@ -101,28 +118,40 @@ class UltimateAuditorCloudV41:
                         e20 = close.ewm(span=20).mean().iloc[-1]
                         rsi = float(self.calculate_rsi(close).iloc[-1])
                         
+                        # 1. EMA Trend (+2)
                         p_ema = 2 if e20 > close.ewm(span=50).mean().iloc[-1] else 0
 
-                        # Pullback Logic
+                        # 2. Pullback Logic (+2, +1, -2 Penalty)
                         pb_val = (abs(last_c - e20)/e20)*100
                         if pb_val <= 1.5: p_pb, pb_status = 2, "Best(+2)"
                         elif 1.5 < pb_val <= 3: p_pb, pb_status = 1, "Acceptable(+1)"
-                        else: p_pb, pb_status = -2, "Avoid(-2)"
+                        else: p_pb, pb_status = -2, "Avoid(-2 Penalty)"
 
-                        # Volume Logic
-                        vol_avg = df['Volume'].tail(5).mean()
-                        curr_vol = df['Volume'].iloc[-1]
+                        # 3. RSI Dynamic Scoring (+1, 0, -1, -2 Penalty)
+                        if 40 <= rsi <= 62: p_rsi, rsi_status = 1, "Sweet Spot(+1)"
+                        elif 62 < rsi < 70: p_rsi, rsi_status = 0, "Neutral(0)"
+                        elif 70 <= rsi <= 80: p_rsi, rsi_status = -1, "Overbought(-1 Penalty)"
+                        elif rsi > 80: p_rsi, rsi_status = -2, "Danger(-2 Penalty)"
+                        else: p_rsi, rsi_status = -1, "Bearish Bear(-1 Penalty)" # RSI < 40 
+
+                        # 4. Liquidity & Volume Analytics (+1, +2, -2 Penalty)
+                        vol_avg = float(df['Volume'].tail(5).mean())
+                        curr_vol = float(df['Volume'].iloc[-1])
+                        
+                        # 💧 New Liquidity Rule (> 5 Lakhs Avg Vol)
+                        if vol_avg >= 500000:
+                            p_liq = 1
+                            liq_status = "Safe / High Liquidity(+1)"
+                        else:
+                            p_liq = -2
+                            liq_status = "Low Liquidity / Circuit Risk(-2 Penalty)"
+
+                        # Volume Spike
                         if curr_vol >= 1.5 * vol_avg: p_vol, vol_status = 2, "High Spike(+2)"
-                        elif curr_vol < 0.7 * vol_avg: p_vol, vol_status = -2, "Low Vol(-2)"
+                        elif curr_vol < 0.7 * vol_avg: p_vol, vol_status = -2, "Low Vol(-2 Penalty)"
                         else: p_vol, vol_status = 0, "Normal(0)"
 
-                        # RSI Logic
-                        if 40 <= rsi <= 62: p_rsi, rsi_status = 1, "Sweet Spot(+1)"
-                        elif 70 <= rsi <= 80: p_rsi, rsi_status = -1, "Overbought(-1)"
-                        elif rsi > 80: p_rsi, rsi_status = -2, "Danger(-2)"
-                        else: p_rsi, rsi_status = 0, "Neutral(0)"
-
-                        # RS Multi-Timeframe
+                        # 5. Relative Strength & Momentum (+3, +1)
                         rs_1w = 1 if close.pct_change(5).iloc[-1] > n_close.pct_change(5).iloc[-1] else 0
                         rs_1m = 1 if close.pct_change(21).iloc[-1] > n_close.pct_change(21).iloc[-1] else 0
                         rs_3m = 1 if close.pct_change(63).iloc[-1] > n_close.pct_change(63).iloc[-1] else 0
@@ -131,67 +160,133 @@ class UltimateAuditorCloudV41:
                         p_hhl = 1 if last_c > df['High'].iloc[-2] else 0
                         p_mom = 1 if last_c >= (df['High'].max() * 0.90) else 0
 
-                        total_score = p_ema + p_rsi + p_pb + p_vol + p_hhl + mkt_pts + rs_total + p_mom + 1
+                        # 🔒 --- 5 GOLDEN FUNDAMENTAL RULES LAジック ---
+                        p_fund = 0
+                        roe_txt, roce_txt, debt_txt, sales_txt, profit_txt = "N/A", "N/A", "N/A", "N/A", "N/A"
+                        
+                        try:
+                            ticker_obj = yf.Ticker(t)
+                            info = ticker_obj.info
+                            
+                            # Rule 1: ROE > 15% (+1)
+                            roe = info.get('returnOnEquity')
+                            if roe:
+                                roe_p = roe * 100
+                                roe_txt = f"{roe_p:.1f}%"
+                                if roe_p > 15: p_fund += 1
+                                
+                            # Rule 2: ROCE > 15% (+1)
+                            roce = info.get('returnOnCapital') or info.get('operatingMargins')
+                            if roce:
+                                roce_p = roce * 100
+                                roce_txt = f"{roce_p:.1f}%"
+                                if roce_p > 15: p_fund += 1
+                                
+                            # Rule 3: Debt/Equity < 1 (+1 | > 2 is -1 Penalty)
+                            debt = info.get('debtToEquity')
+                            if debt is not None:
+                                d_e = debt / 100
+                                debt_txt = f"{d_e:.2f}"
+                                if d_e < 1.0: p_fund += 1
+                                elif d_e > 2.0: p_fund -= 1
+                                
+                            # Rule 4: Sales Growth > 10% (+1)
+                            sales_g = info.get('revenueGrowth')
+                            if sales_g:
+                                rev_p = sales_g * 100
+                                sales_txt = f"{rev_p:.1f}%"
+                                if rev_p > 10: p_fund += 1
+                                
+                            # Rule 5: Profit Growth > 10% (+1)
+                            profit_g = info.get('earningsGrowth')
+                            if profit_g:
+                                e_p = profit_g * 100
+                                profit_txt = f"{e_p:.1f}%"
+                                if e_p > 10: p_fund += 1
+                        except: pass
+
+                        # 🏆 టోటల్ స్కోర్ కాలిక్యులేషన్ (గరిష్టంగా 20 పాయింట్లు)
+                        total_score = p_ema + p_rsi + p_pb + p_vol + p_liq + p_hhl + mkt_pts + rs_total + p_mom + p_fund + 1
                         wr, last_10 = self.backtest_logic(df)
 
-                        # --- మీ అసలు కండిషన్: Score >= 8 మరియు WR >= 50 ---
-                        if total_score >= 10 and wr >= 60:
-                            quality_val = "High" if total_score >= 12 else "Watchlist"
-                            verdict_val = "Strong Buy" if (total_score >= 12 and wr >= 60) else "Watchlist"
-
-                            roe_val = "Data N/A"
-                            try:
-                                ticker_obj = yf.Ticker(t)
-                                info = ticker_obj.info
-                                roe = info.get('returnOnEquity') or info.get('returnOnAssets')
-                                if roe: roe_val = f"{roe * 100:.2f}%"
-                            except: pass
-
-                            # --- Interpretations ---
-                            tech_why = (f"• EMA: 20>50({'+2' if p_ema==2 else '0'}) -> Bullish Trend\n"
-                                        f"• RSI: {rsi:.1f}({rsi_status}) -> {'Healthy Zone' if p_rsi==1 else 'Caution Zone'}\n"
-                                        f"• Pull: {pb_val:.1f}%({pb_status}) -> {'Ideal Entry' if p_pb==2 else 'Risk of Reversal'}\n"
-                                        f"• Vol: {vol_status} -> {'Institutional Move' if p_vol==2 else 'Retail Flow'}\n"
-                                        f"• Action: HH(+1) -> Trend Intact")
-
-                            strength_why = (f"• Nifty: {'Supportive(+1)' if mkt_pts==1 else 'Caution(0)'}\n"
-                                            f"• Context: {'No tailwind from index' if mkt_pts==0 else 'Strong Market Support'}\n"
-                                            f"• RS Beat: {rs_total}/3 (1W,1M,3M)")
-
-                            mom_why = f"• 52W High: {'Peak(+1)' if p_mom==1 else 'Normal(0)'} -> Momentum Positive"
-                            fund_why = f"• ROE: {roe_val}\n• EBITDA: Positive Growth"
-                            
-                            mkt_why = (f"• Nifty Status: *{'WEAK (Major Red Flag)' if mkt_pts==0 else 'BULLISH'}*\n"
-                                       f"• Strategy: *{'Avoid/Trade Small' if mkt_pts==0 else 'Go Full Size'}*\n"
-                                       f"• Status: Verified Quality")
+                        # --- స్ట్రిక్ట్ ఫిల్టరింగ్: స్కోర్ 13 దాటి మరియు విన్ రేట్ 60% పైనున్న వాటిని మాత్రమే తీసుకుంటుంది ---
+                        if total_score >= 13 and wr >= 60:
+                            quality_val = "Super Institutional" if total_score >= 15 else "Watchlist Grade"
+                            verdict_val = "Strong Buy" if (total_score >= 15 and wr >= 60) else "Watchlist"
 
                             sl_val = round(df['Low'].tail(5).min(), 2)
                             risk = last_c - sl_val
                             target_val = round(last_c + (risk * 2), 2)
-                            qty_val = int((CAPITAL * RISK_PERCENT) / risk) if risk > 0 else 0
+                            
+                            target_pct = round(((target_val - last_c) / last_c) * 100, 2)
+                            sl_pct = round(((last_c - sl_val) / last_c) * 100, 2)
 
-                            # Save to Cloud Report
+                            final_buy_price = round(last_c, 2)
+                            final_sl_price = round(sl_val, 2)
+                            final_target_price = round(target_val, 2)
+
+                            # --- షీట్ మరియు టెలిగ్రామ్ కోసం టెక్స్ట్ బ్లాక్స్ ---
+                            tech_sheet = (f"• EMA: 20>50({'+2' if p_ema==2 else '0'})\n"
+                                          f"• RSI: {rsi:.1f}({rsi_status})\n"
+                                          f"• Pullback: {pb_val:.1f}%({pb_status})\n"
+                                          f"• Price Act: HH(+1)")
+
+                            strength_sheet = (f"• RS Beat: {rs_total}/3 (1W,1M,3M)\n"
+                                              f"• 52W High: {'Peak(+1)' if p_mom==1 else 'Normal(0)'}")
+
+                            mom_sheet = (f"• 5-Day Avg Vol: {vol_avg:,.0f}({'+1' if p_liq==1 else '-2'})\n"
+                                         f"• Vol Spike: {vol_status}\n"
+                                         f"• ROE: {roe_txt} | ROCE: {roce_txt}\n"
+                                         f"• Debt/Equity: {debt_txt}\n"
+                                         f"• Sales Growth: {sales_txt}\n"
+                                         f"• Profit Growth: {profit_txt}")
+                            
+                            mkt_sheet = (f"• Nifty: {'BULLISH(+1)' if mkt_pts==1 else 'WEAK(0)'}\n"
+                                         f"• Strategy: {'Go Full Size' if mkt_pts==1 else 'Avoid/Trade Small'}\n"
+                                         f"• Total Score: {total_score}/20")
+                            
+                            backtest_sheet = f"WR: {wr:.0f}% | {last_10}"
+
+                            # Local Report సేవ్
                             writer.writerow([
-                                t, f"Score: {total_score}/14", quality_val, round(last_c, 2), sl_val, target_val, 
-                                qty_val, "01:02", tech_why, strength_why, mom_why, fund_why, mkt_why,
-                                f"{wr:.0f}%", last_10, verdict_val
+                                "", t, final_buy_price, final_sl_price, final_target_price, "", "", "", target_pct, sl_pct, "", 
+                                tech_sheet, strength_sheet, mom_sheet, mkt_sheet, backtest_sheet
                             ])
 
-                            # Telegram Alert (v41.0 ఒరిజినల్ ఫార్మాట్)
+                            # 📊 గూగుల్ షీట్ లైవ్ ఆటోమేషన్ ఫార్ములాలు
+                            if self.sheet is not None:
+                                try:
+                                    current_date = time.strftime("%d.%m.%y")
+                                    next_row_idx = len(self.sheet.get_all_values()) + 1
+                                    ticker_clean = t.replace('.NS', '').strip()
+                                    google_ticker = f"NSE:{ticker_clean}"
+                                    
+                                    live_price_formula = f'=IFERROR(GOOGLEFINANCE("{google_ticker}"), {final_buy_price})'
+                                    change_formula = f'=IFERROR(((F{next_row_idx}-C{next_row_idx})/C{next_row_idx})*100, 0)'
+                                    status_formula = f'=IF(F{next_row_idx}>=E{next_row_idx}, "TARGET HIT", IF(F{next_row_idx}<=D{next_row_idx}, "SL HIT", "HOLD"))'
+
+                                    self.sheet.append_row([
+                                        current_date, t, final_buy_price, final_sl_price, final_target_price, 
+                                        live_price_formula, change_formula, status_formula, f"{target_pct}%", f"{sl_pct}%", "", 
+                                        tech_sheet, strength_sheet, mom_sheet, mkt_sheet, backtest_sheet
+                                    ], value_input_option='USER_ENTERED')
+                                except: pass
+
+                            # 📱 టెలిగ్రామ్ ప్రొఫెషనల్ అలర్ట్
                             alert_msg = (
-                                f"🚀 *STRATEGIC TRADE AUDIT: {t}*\n"
+                                f"🚀 *20-POINT SWING AUDIT: {t}*\n"
                                 f"━━━━━━━━━━━━━━━━━━━━\n"
-                                f"🏆 *TOTAL SCORE: {total_score}/14 | {quality_val}*\n"
+                                f"🏆 *TOTAL SCORE: {total_score}/20 | {quality_val}*\n"
                                 f"🎯 *FINAL VERDICT: {verdict_val}*\n\n"
                                 f"💰 *TRADE SETUP*\n"
-                                f"• BUY: ₹{last_c:.2f}\n"
-                                f"• SL: ₹{sl_val:.2f} | TGT: ₹{target_val:.2f}\n"
-                                f"• QTY: {qty_val} Shares | R:R: 1:2\n\n"
-                                f"📊 *1. TECHNICALS (Setup Strength)*\n{tech_why}\n\n"
-                                f"💪 *2. STRENGTH ANALYSIS*\n{strength_why}\n\n"
-                                f"📈 *3. MOMENTUM & FUNDAMENTALS*\n{mom_why}\n{fund_why}\n\n"
-                                f"🌍 *4. MARKET CONDITION (CRITICAL)*\n{mkt_why}\n\n"
-                                f"📉 *BACKTEST (Present → Past)*\nWR: {wr:.0f}% | {last_10}\n"
+                                f"• BUY: ₹{final_buy_price:.2f}\n"
+                                f"• SL: ₹{final_sl_price:.2f} | TGT: ₹{final_target_price:.2f}\n"
+                                f"• TGT %: {target_pct}% | SL %: {sl_pct}%\n\n"
+                                f"📊 *1. TECHNICALS (Setup & Timing)*\n{tech_sheet}\n\n"
+                                f"💪 *2. RELATIVE STRENGTH*\n{strength_sheet}\n\n"
+                                f"🔒 *3. LIQUIDITY & 5-GOLDEN RULES*\n{mom_sheet}\n\n"
+                                f"🌍 *4. MARKET CONDITION (CRITICAL)*\n{mkt_sheet}\n\n"
+                                f"📉 *BACKTEST HISTORY*\n{backtest_sheet}\n"
                                 f"━━━━━━━━━━━━━━━━━━━━\n"
                                 f"👤 *Verified by: Ashok Reddy*"
                             )
@@ -202,8 +297,8 @@ class UltimateAuditorCloudV41:
                             time.sleep(1)
                 except: continue
 
-        bot.send_message(CHAT_ID, "🏁 *AUTOMATED SCAN COMPLETED!*")
+        bot.send_message(CHAT_ID, "🏁 *ULTIMATE 20-POINT SCAN COMPLETED!*")
 
 if __name__ == "__main__":
-    auditor = UltimateAuditorCloudV41()
+    auditor = UltimateAuditorCloudV43()
     auditor.start()
