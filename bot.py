@@ -210,7 +210,7 @@ class UltimateAuditorCloudV43:
                         wr, last_10 = self.backtest_logic(df)
 
                         # --- స్ట్రిక్ట్ ఫిల్టరింగ్: స్కోర్ 13 దాటి మరియు విన్ రేట్ 60% పైనున్న వాటిని మాత్రమే తీసుకుంటుంది ---
-                        if total_score >= 10 and wr >= 50:
+                        if total_score >= 14 and wr >= 60:
                             quality_val = "Super Institutional" if total_score >= 15 else "Watchlist Grade"
                             verdict_val = "Strong Buy" if (total_score >= 15 and wr >= 60) else "Watchlist"
 
