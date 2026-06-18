@@ -22,7 +22,7 @@ class UltimateAuditorCloudV43:
     def __init__(self):
         self.output_path = 'Final_Institutional_Report.csv'
         
-        # 🟢 మీ 16 పాయింట్ల పక్కా గూగుల్ షీట్ హెడర్స్ ఆర్డర్
+        # 🟢 మీ 16 పాయింట్ల పక్కా గూగుల్ షీట్ హెడర్స్ ఆర్డర్ (A నుండి P కాలమ్స్)
         self.headers = [
             'Date of Entry', 'Stock Name', 'Buy_Price', 'Stop_Loss', 'Target', 
             'Live Price', '% Change (Buy vs Live)', 'Status', 'Target %', 'SL %', 
@@ -45,7 +45,7 @@ class UltimateAuditorCloudV43:
             self.sheet = client.open(GOOGLE_SHEET_NAME).sheet1
             print("✅ Google Sheets Connection Successful!")
             if not self.sheet.get_all_values():
-                self.sheet.append_row(self.headers)
+                self.sheet.append_row(self.headers, value_input_option='USER_ENTERED')
         except Exception as e:
             print(f"⚠️ Google Sheets Connection Failed: {e}")
 
@@ -85,7 +85,7 @@ class UltimateAuditorCloudV43:
 
     def start(self):
         print("🚀 Cloud v43.0 Active: 20-Point Balanced Scoring System Engaged...")
-        bot.send_message(CHAT_ID, "🚀 *Cloud Scan Started (Ultimate 20-Point Scoring & 16-Column Journal Active)...*", parse_mode='Markdown')
+        bot.send_message(CHAT_ID, "🚀 *Cloud Scan Started (Ultimate Linear Alignment Active)...*", parse_mode='Markdown')
         
         try:
             nifty = yf.download("^NSEI", period="1y", progress=False)
@@ -160,7 +160,7 @@ class UltimateAuditorCloudV43:
                         p_hhl = 1 if last_c > df['High'].iloc[-2] else 0
                         p_mom = 1 if last_c >= (df['High'].max() * 0.90) else 0
 
-                        # 🔒 --- 5 GOLDEN FUNDAMENTAL RULES LAジック ---
+                        # 🔒 --- 5 GOLDEN FUNDAMENTAL RULES ---
                         p_fund = 0
                         roe_txt, roce_txt, debt_txt, sales_txt, profit_txt = "N/A", "N/A", "N/A", "N/A", "N/A"
                         
@@ -209,7 +209,7 @@ class UltimateAuditorCloudV43:
                         total_score = p_ema + p_rsi + p_pb + p_vol + p_liq + p_hhl + mkt_pts + rs_total + p_mom + p_fund + 1
                         wr, last_10 = self.backtest_logic(df)
 
-                        # --- స్ట్రిక్ట్ ఫిల్టరింగ్: స్కోర్ 13 దాటి మరియు విన్ రేట్ 60% పైనున్న వాటిని మాత్రమే తీసుకుంటుంది ---
+                        # --- స్ట్రిక్ట్ ఫిల్టరింగ్ ---
                         if total_score >= 13 and wr >= 60:
                             quality_val = "Super Institutional" if total_score >= 15 else "Watchlist Grade"
                             verdict_val = "Strong Buy" if (total_score >= 15 and wr >= 60) else "Watchlist"
@@ -224,40 +224,31 @@ class UltimateAuditorCloudV43:
                             final_buy_price = round(last_c, 2)
                             final_sl_price = round(sl_val, 2)
                             final_target_price = round(target_val, 2)
+                            current_date = time.strftime("%d.%m.%y")
 
-                            # --- షీట్ మరియు టెలిగ్రామ్ కోసం టెక్స్ట్ బ్లాక్స్ ---
-                            tech_sheet = (f"• EMA: 20>50({'+2' if p_ema==2 else '0'})\n"
-                                          f"• RSI: {rsi:.1f}({rsi_status})\n"
-                                          f"• Pullback: {pb_val:.1f}%({pb_status})\n"
-                                          f"• Price Act: HH(+1)")
-
-                            strength_sheet = (f"• RS Beat: {rs_total}/3 (1W,1M,3M)\n"
-                                              f"• 52W High: {'Peak(+1)' if p_mom==1 else 'Normal(0)'}")
-
-                            mom_sheet = (f"• 5-Day Avg Vol: {vol_avg:,.0f}({'+1' if p_liq==1 else '-2'})\n"
-                                         f"• Vol Spike: {vol_status}\n"
-                                         f"• ROE: {roe_txt} | ROCE: {roce_txt}\n"
-                                         f"• Debt/Equity: {debt_txt}\n"
-                                         f"• Sales Growth: {sales_txt}\n"
-                                         f"• Profit Growth: {profit_txt}")
-                            
-                            mkt_sheet = (f"• Nifty: {'BULLISH(+1)' if mkt_pts==1 else 'WEAK(0)'}\n"
-                                         f"• Strategy: {'Go Full Size' if mkt_pts==1 else 'Avoid/Trade Small'}\n"
-                                         f"• Total Score: {total_score}/20")
-                            
+                            # 💡 గూగుల్ షీట్‌లో లైన్ బ్రేక్స్ లేకుండా సింగిల్ లైన్ ఫార్మాట్ (\n తీసేసి పైప్ '|' సింబల్ పెట్టాం)
+                            tech_sheet = f"EMA: 20>50 | RSI: {rsi:.1f}({rsi_status}) | Pullback: {pb_val:.1f}%({pb_status}) | Price Act: HH"
+                            strength_sheet = f"RS Beat: {rs_total}/3 | 52W High: {'Peak' if p_mom==1 else 'Normal'}"
+                            mom_sheet = f"VolAvg: {vol_avg:,.0f} | Spike: {vol_status} | ROE: {roe_txt} | ROCE: {roce_txt} | Debt: {debt_txt} | Sales: {sales_txt} | Profit: {profit_txt}"
+                            mkt_sheet = f"Nifty: {'BULLISH' if mkt_pts==1 else 'WEAK'} | Strategy: {'Full Size' if mkt_pts==1 else 'Avoid'} | Score: {total_score}/20"
                             backtest_sheet = f"WR: {wr:.0f}% | {last_10}"
 
-                            # Local Report సేవ్
+                            # Local Report సేవ్ (మొదటి ఖాళీ కోట్స్ తీసేసాం)
                             writer.writerow([
-                                "", t, final_buy_price, final_sl_price, final_target_price, "", "", "", target_pct, sl_pct, "", 
+                                current_date, t, final_buy_price, final_sl_price, final_target_price, "", "", "", target_pct, sl_pct, "", 
                                 tech_sheet, strength_sheet, mom_sheet, mkt_sheet, backtest_sheet
                             ])
 
-                            # 📊 గూగుల్ షీట్ లైవ్ ఆటోమేషన్ ఫార్ములాలు
+                            # 📊 గూగుల్ షీట్ లైవ్ ఆటోమేషన్ ఫార్ములాలు (A నుండి P పక్కా ఆర్డర్)
                             if self.sheet is not None:
                                 try:
-                                    current_date = time.strftime("%d.%m.%y")
-                                    next_row_idx = len(self.sheet.get_all_values()) + 1
+                                    current_values = self.sheet.get_all_values()
+                                    if not current_values or len(current_values) == 0:
+                                        self.sheet.append_row(self.headers, value_input_option='USER_ENTERED')
+                                        time.sleep(1)
+                                        current_values = self.sheet.get_all_values()
+
+                                    next_row_idx = len(current_values) + 1
                                     ticker_clean = t.replace('.NS', '').strip()
                                     google_ticker = f"NSE:{ticker_clean}"
                                     
@@ -265,14 +256,17 @@ class UltimateAuditorCloudV43:
                                     change_formula = f'=IFERROR(((F{next_row_idx}-C{next_row_idx})/C{next_row_idx})*100, 0)'
                                     status_formula = f'=IF(F{next_row_idx}>=E{next_row_idx}, "TARGET HIT", IF(F{next_row_idx}<=D{next_row_idx}, "SL HIT", "HOLD"))'
 
+                                    # ఎక్కడా ఇండెక్స్ మిస్ అవ్వకుండా 16 ఎలిమెంట్స్ పక్కా లీనియర్ లిస్ట్
                                     self.sheet.append_row([
                                         current_date, t, final_buy_price, final_sl_price, final_target_price, 
                                         live_price_formula, change_formula, status_formula, f"{target_pct}%", f"{sl_pct}%", "", 
                                         tech_sheet, strength_sheet, mom_sheet, mkt_sheet, backtest_sheet
                                     ], value_input_option='USER_ENTERED')
-                                except: pass
+                                    time.sleep(1)
+                                except Exception as e:
+                                    print(f"❌ Sheets Sync Error: {e}")
 
-                            # 📱 టెలిగ్రామ్ ప్రొఫెషనల్ అలర్ట్
+                            # 📱 టెలిగ్రామ్ ప్రొఫెషనల్ అలర్ట్ (ఇక్కడ మాత్రం ఫోన్ లో చదవడానికి వీలుగా బుల్లెట్ పాయింట్స్ వస్తాయి)
                             alert_msg = (
                                 f"🚀 *20-POINT SWING AUDIT: {t}*\n"
                                 f"━━━━━━━━━━━━━━━━━━━━\n"
@@ -282,11 +276,11 @@ class UltimateAuditorCloudV43:
                                 f"• BUY: ₹{final_buy_price:.2f}\n"
                                 f"• SL: ₹{final_sl_price:.2f} | TGT: ₹{final_target_price:.2f}\n"
                                 f"• TGT %: {target_pct}% | SL %: {sl_pct}%\n\n"
-                                f"📊 *1. TECHNICALS (Setup & Timing)*\n{tech_sheet}\n\n"
-                                f"💪 *2. RELATIVE STRENGTH*\n{strength_sheet}\n\n"
-                                f"🔒 *3. LIQUIDITY & 5-GOLDEN RULES*\n{mom_sheet}\n\n"
-                                f"🌍 *4. MARKET CONDITION (CRITICAL)*\n{mkt_sheet}\n\n"
-                                f"📉 *BACKTEST HISTORY*\n{backtest_sheet}\n"
+                                f"📊 *1. TECHNICALS*\n• {tech_sheet.replace(' | ', '\n• ')}\n\n"
+                                f"💪 *2. RELATIVE STRENGTH*\n• {strength_sheet.replace(' | ', '\n• ')}\n\n"
+                                f"🔒 *3. LIQUIDITY & FUNDAMENTALS*\n• {mom_sheet.replace(' | ', '\n• ')}\n\n"
+                                f"🌍 *4. MARKET CONDITION*\n• {mkt_sheet.replace(' | ', '\n• ')}\n\n"
+                                f"📉 *BACKTEST HISTORY*\n• {backtest_sheet}\n"
                                 f"━━━━━━━━━━━━━━━━━━━━\n"
                                 f"👤 *Verified by: Ashok Reddy*"
                             )
@@ -294,7 +288,6 @@ class UltimateAuditorCloudV43:
                                 bot.send_message(CHAT_ID, alert_msg, parse_mode='Markdown')
                             except: pass
 
-                            time.sleep(1)
                 except: continue
 
         bot.send_message(CHAT_ID, "🏁 *ULTIMATE 20-POINT SCAN COMPLETED!*")
