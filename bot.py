@@ -44,8 +44,11 @@ class UltimateAuditorCloudV43:
             client = gspread.authorize(creds)
             self.sheet = client.open(GOOGLE_SHEET_NAME).sheet1
             print("✅ Google Sheets Connection Successful!")
-            if not self.sheet.get_all_values():
-                self.sheet.append_row(self.headers, value_input_option='USER_ENTERED')
+            try:
+                current_rows = self.sheet.get_all_values()
+                if not current_rows or len(current_rows) == 0:
+                    self.sheet.append_row(self.headers, value_input_option='USER_ENTERED')
+            except: pass
         except Exception as e:
             print(f"⚠️ Google Sheets Connection Failed: {e}")
 
@@ -127,18 +130,17 @@ class UltimateAuditorCloudV43:
                         elif 1.5 < pb_val <= 3: p_pb, pb_status = 1, "Acceptable(+1)"
                         else: p_pb, pb_status = -2, "Avoid(-2 Penalty)"
 
-                        # 3. RSI Dynamic Scoring (+1, 0, -1, -2 Penalty)
+                        # 3. RSI Dynamic Scoring
                         if 40 <= rsi <= 62: p_rsi, rsi_status = 1, "Sweet Spot(+1)"
                         elif 62 < rsi < 70: p_rsi, rsi_status = 0, "Neutral(0)"
                         elif 70 <= rsi <= 80: p_rsi, rsi_status = -1, "Overbought(-1 Penalty)"
                         elif rsi > 80: p_rsi, rsi_status = -2, "Danger(-2 Penalty)"
-                        else: p_rsi, rsi_status = -1, "Bearish Bear(-1 Penalty)" # RSI < 40 
+                        else: p_rsi, rsi_status = -1, "Bearish Bear(-1 Penalty)"
 
                         # 4. Liquidity & Volume Analytics (+1, +2, -2 Penalty)
                         vol_avg = float(df['Volume'].tail(5).mean())
                         curr_vol = float(df['Volume'].iloc[-1])
                         
-                        # 💧 New Liquidity Rule (> 5 Lakhs Avg Vol)
                         if vol_avg >= 500000:
                             p_liq = 1
                             liq_status = "Safe / High Liquidity(+1)"
@@ -168,21 +170,18 @@ class UltimateAuditorCloudV43:
                             ticker_obj = yf.Ticker(t)
                             info = ticker_obj.info
                             
-                            # Rule 1: ROE > 15% (+1)
                             roe = info.get('returnOnEquity')
                             if roe:
                                 roe_p = roe * 100
                                 roe_txt = f"{roe_p:.1f}%"
                                 if roe_p > 15: p_fund += 1
                                 
-                            # Rule 2: ROCE > 15% (+1)
                             roce = info.get('returnOnCapital') or info.get('operatingMargins')
                             if roce:
                                 roce_p = roce * 100
                                 roce_txt = f"{roce_p:.1f}%"
                                 if roce_p > 15: p_fund += 1
                                 
-                            # Rule 3: Debt/Equity < 1 (+1 | > 2 is -1 Penalty)
                             debt = info.get('debtToEquity')
                             if debt is not None:
                                 d_e = debt / 100
@@ -190,14 +189,12 @@ class UltimateAuditorCloudV43:
                                 if d_e < 1.0: p_fund += 1
                                 elif d_e > 2.0: p_fund -= 1
                                 
-                            # Rule 4: Sales Growth > 10% (+1)
                             sales_g = info.get('revenueGrowth')
                             if sales_g:
                                 rev_p = sales_g * 100
                                 sales_txt = f"{rev_p:.1f}%"
                                 if rev_p > 10: p_fund += 1
                                 
-                            # Rule 5: Profit Growth > 10% (+1)
                             profit_g = info.get('earningsGrowth')
                             if profit_g:
                                 e_p = profit_g * 100
@@ -205,7 +202,6 @@ class UltimateAuditorCloudV43:
                                 if e_p > 10: p_fund += 1
                         except: pass
 
-                        # 🏆 టోటల్ స్కోర్ కాలిక్యులేషన్ (గరిష్టంగా 20 పాయింట్లు)
                         total_score = p_ema + p_rsi + p_pb + p_vol + p_liq + p_hhl + mkt_pts + rs_total + p_mom + p_fund + 1
                         wr, last_10 = self.backtest_logic(df)
 
@@ -226,20 +222,19 @@ class UltimateAuditorCloudV43:
                             final_target_price = round(target_val, 2)
                             current_date = time.strftime("%d.%m.%y")
 
-                            # 💡 గూగుల్ షీట్‌లో లైన్ బ్రేక్స్ లేకుండా సింగిల్ లైన్ ఫార్మాట్ (\n తీసేసి పైప్ '|' సింబల్ పెట్టాం)
                             tech_sheet = f"EMA: 20>50 | RSI: {rsi:.1f}({rsi_status}) | Pullback: {pb_val:.1f}%({pb_status}) | Price Act: HH"
                             strength_sheet = f"RS Beat: {rs_total}/3 | 52W High: {'Peak' if p_mom==1 else 'Normal'}"
                             mom_sheet = f"VolAvg: {vol_avg:,.0f} | Spike: {vol_status} | ROE: {roe_txt} | ROCE: {roce_txt} | Debt: {debt_txt} | Sales: {sales_txt} | Profit: {profit_txt}"
                             mkt_sheet = f"Nifty: {'BULLISH' if mkt_pts==1 else 'WEAK'} | Strategy: {'Full Size' if mkt_pts==1 else 'Avoid'} | Score: {total_score}/20"
                             backtest_sheet = f"WR: {wr:.0f}% | {last_10}"
 
-                            # Local Report సేవ్ (మొదటి ఖాళీ కోట్స్ తీసేసాం)
+                            # Local Report సేవ్
                             writer.writerow([
                                 current_date, t, final_buy_price, final_sl_price, final_target_price, "", "", "", target_pct, sl_pct, "", 
                                 tech_sheet, strength_sheet, mom_sheet, mkt_sheet, backtest_sheet
                             ])
 
-                            # 📊 గూగుల్ షీట్ లైవ్ ఆటోమేషన్ ఫార్ములాలు (A నుండి P పక్కా ఆర్డర్)
+                            # 📊 గూగుల్ షీట్ లైవ్ ఆటోమేషన్ ఫార్ములాలు
                             if self.sheet is not None:
                                 try:
                                     current_values = self.sheet.get_all_values()
@@ -256,7 +251,6 @@ class UltimateAuditorCloudV43:
                                     change_formula = f'=IFERROR(((F{next_row_idx}-C{next_row_idx})/C{next_row_idx})*100, 0)'
                                     status_formula = f'=IF(F{next_row_idx}>=E{next_row_idx}, "TARGET HIT", IF(F{next_row_idx}<=D{next_row_idx}, "SL HIT", "HOLD"))'
 
-                                    # ఎక్కడా ఇండెక్స్ మిస్ అవ్వకుండా 16 ఎలిమెంట్స్ పక్కా లీనియర్ లిస్ట్
                                     self.sheet.append_row([
                                         current_date, t, final_buy_price, final_sl_price, final_target_price, 
                                         live_price_formula, change_formula, status_formula, f"{target_pct}%", f"{sl_pct}%", "", 
@@ -266,7 +260,7 @@ class UltimateAuditorCloudV43:
                                 except Exception as e:
                                     print(f"❌ Sheets Sync Error: {e}")
 
-                            # 📱 టెలిగ్రామ్ ప్రొఫెషనల్ అలర్ట్ (ఇక్కడ మాత్రం ఫోన్ లో చదవడానికి వీలుగా బుల్లెట్ పాయింట్స్ వస్తాయి)
+                            # 📱 టెలిగ్రామ్ ప్రొఫెషనల్ అలర్ట్
                             alert_msg = (
                                 f"🚀 *20-POINT SWING AUDIT: {t}*\n"
                                 f"━━━━━━━━━━━━━━━━━━━━\n"
