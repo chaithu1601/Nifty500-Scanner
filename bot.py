@@ -88,7 +88,7 @@ class UltimateAuditorCloudV43:
 
     def start(self):
         print("🚀 Cloud Scan Started...")
-        bot.send_message(CHAT_ID, "🚀 *Cloud Scan Started (20-Point Linear Alignment System Active)...*", parse_mode='Markdown')
+        bot.send_message(CHAT_ID, "🚀 *Cloud Scan Started (Fixed Linear System Active)...*", parse_mode='Markdown')
         
         try:
             nifty = yf.download("^NSEI", period="1y", progress=False)
@@ -216,12 +216,12 @@ class UltimateAuditorCloudV43:
                             final_target_price = round(target_val, 2)
                             current_date = time.strftime("%d.%m.%y")
 
-                            # 💡 షీట్ అలైన్‌మెంట్ కోసం ఒకే సెల్‌లో డేటాను స్పేసెస్‌తో రీప్లేస్ చేసాం (\n తీసేసాం)
-                            tech_sheet = f"EMA:20>50 | RSI:{rsi:.1f}({rsi_status}) | Pullback:{pb_val:.1f}%({pb_status}) | Price Act:HH"
-                            strength_sheet = f"RS Beat:{rs_total}/3 | 52W High:{'Peak' if p_mom==1 else 'Normal'}"
-                            mom_sheet = f"VolAvg:{vol_avg:,.0f} | Spike:{vol_status} | ROE:{roe_txt} | ROCE:{roce_txt} | Debt:{debt_txt} | Sales:{sales_txt} | Profit:{profit_txt}"
-                            mkt_sheet = f"Nifty:{'BULLISH' if mkt_pts==1 else 'WEAK'} | Strategy:{'Full Size' if mkt_pts==1 else 'Avoid'} | Score:{total_score}/20"
-                            backtest_sheet = f"WR:{wr:.0f}% | {last_10}"
+                            # 💡 గూగుల్ షీట్‌లో లైన్ బ్రేక్స్ లేకుండా సింగిల్ లైన్ ఫార్మాట్
+                            tech_sheet = f"EMA: 20>50 | RSI: {rsi:.1f}({rsi_status}) | Pullback: {pb_val:.1f}%({pb_status}) | Price Act: HH"
+                            strength_sheet = f"RS Beat: {rs_total}/3 | 52W High: {'Peak' if p_mom==1 else 'Normal'}"
+                            mom_sheet = f"VolAvg: {vol_avg:,.0f} | Spike: {vol_status} | ROE: {roe_txt} | ROCE: {roce_txt} | Debt: {debt_txt} | Sales: {sales_txt} | Profit: {profit_txt}"
+                            mkt_sheet = f"Nifty: {'BULLISH' if mkt_pts==1 else 'WEAK'} | Strategy: {'Full Size' if mkt_pts==1 else 'Avoid'} | Score: {total_score}/20"
+                            backtest_sheet = f"WR: {wr:.0f}% | {last_10}"
 
                             # Local CSV రిపోర్ట్
                             writer.writerow([
@@ -229,10 +229,9 @@ class UltimateAuditorCloudV43:
                                 tech_sheet, strength_sheet, mom_sheet, mkt_sheet, backtest_sheet
                             ])
 
-                            # 📊 గూగుల్ షీట్ లైవ్ ఆటోమేషన్ (పక్కా లీనియర్ రో ఆర్డర్)
+                            # 📊 గూగుల్ షీట్ లైవ్ ఆటోమేషన్
                             if self.sheet is not None:
                                 try:
-                                    # హెడర్స్ ఫోర్స్ అప్‌డేట్
                                     current_values = self.sheet.get_all_values()
                                     if not current_values or len(current_values) == 0:
                                         self.sheet.append_row(self.headers, value_input_option='USER_ENTERED')
@@ -266,13 +265,12 @@ class UltimateAuditorCloudV43:
                                         backtest_sheet               # P
                                     ]
                                     
-                                    # నేరుగా రో చివరన పక్కాగా అపెండ్ చేయడం
                                     self.sheet.append_row(row_data, value_input_option='USER_ENTERED')
                                     time.sleep(1)
                                 except Exception as sheet_err:
                                     print(f"Sheet Append Error: {sheet_err}")
 
-                            # 📱 టెలిగ్రామ్ అలర్ట్ (టెలిగ్రామ్‌లో మాత్రం బుల్లెట్ పాయింట్స్ నీట్‌గా కనిపిస్తాయి)
+                            # 📱 టెలిగ్రామ్ అలర్ట్
                             alert_msg = (
                                 f"🚀 *20-POINT SWING AUDIT: {t}*\n"
                                 f"━━━━━━━━━━━━━━━━━━━━\n"
@@ -282,7 +280,7 @@ class UltimateAuditorCloudV43:
                                 f"• BUY: ₹{final_buy_price:.2f}\n"
                                 f"• SL: ₹{final_sl_price:.2f} | TGT: ₹{final_target_price:.2f}\n"
                                 f"• TGT %: {target_pct}% | SL %: {sl_pct}%\n\n"
-                                f"📊 *1. TECHNICALS*\n• {tech_sheet.replace(' | ', ' Change• ')}\n\n"
+                                f"📊 *1. TECHNICALS*\n• {tech_sheet.replace(' | ', '\n• ')}\n\n"
                                 f"💪 *2. RELATIVE STRENGTH*\n• {strength_sheet.replace(' | ', '\n• ')}\n\n"
                                 f"🔒 *3. LIQUIDITY & FUNDAMENTALS*\n• {mom_sheet.replace(' | ', '\n• ')}\n\n"
                                 f"🌍 *4. MARKET CONDITION*\n• {mkt_sheet.replace(' | ', '\n• ')}\n\n"
